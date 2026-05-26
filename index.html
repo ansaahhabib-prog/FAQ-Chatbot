@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FAQ Chatbot – NLP Cosine Similarity</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 16px;
+      color: #1a202c;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #2d3748;
+    }
+
+    header p {
+      font-size: 14px;
+      color: #718096;
+      margin-top: 6px;
+    }
+
+    .container {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      width: 100%;
+      max-width: 680px;
+      padding: 24px;
+    }
+
+    /* Topic Pills */
+    .topic-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .pill {
+      font-size: 12px;
+      padding: 5px 14px;
+      border-radius: 999px;
+      border: 1px solid #cbd5e0;
+      background: #edf2f7;
+      color: #4a5568;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .pill:hover {
+      background: #bee3f8;
+      border-color: #90cdf4;
+      color: #2b6cb0;
+    }
+
+    /* Chat window */
+    #chat-window {
+      height: 380px;
+      overflow-y: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: #f7fafc;
+      margin-bottom: 14px;
+      scroll-behavior: smooth;
+    }
+
+    .bubble {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.6;
+      word-wrap: break-word;
+    }
+
+    .user-bubble {
+      align-self: flex-end;
+      background: #3182ce;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .bot-bubble {
+      align-self: flex-start;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      color: #2d3748;
+      border-bottom-left-radius: 4px;
+    }
+
+    .bot-bubble .matched-q {
+      font-size: 11px;
+      color: #a0aec0;
+      font-style: italic;
+      margin-top: 6px;
+    }
+
+    .bot-bubble .confidence {
+      font-size: 11px;
+      color: #68d391;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .bot-bubble .confidence.low {
+      color: #fc8181;
+    }
+
+    /* Input row */
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-row input {
+      flex: 1;
+      padding: 10px 14px;
+      border: 1px solid #cbd5e0;
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+      font-family: inherit;
+      color: #2d3748;
+      background: #fff;
+    }
+
+    .input-row input:focus {
+      border-color: #3182ce;
+    }
+
+    .input-row button {
+      padding: 10px 20px;
+      background: #3182ce;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .input-row button:hover {
+      background: #2b6cb0;
+    }
+
+    /* NLP info panel */
+    .info-panel {
+      margin-top: 20px;
+      background: #ebf8ff;
+      border: 1px solid #bee3f8;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .info-panel h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #2b6cb0;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .info-panel ul {
+      padding-left: 18px;
+      font-size: 13px;
+      color: #2c5282;
+      line-height: 1.8;
+    }
+
+    /* Typing indicator */
+    .typing {
+      align-self: flex-start;
+      font-size: 13px;
+      color: #a0aec0;
+      font-style: italic;
+      padding: 6px 0;
+    }
+
+    footer {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #a0aec0;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🤖 FAQ Chatbot</h1>
+    <p>NLP-based question matching using Cosine Similarity &amp; TF Vectorization</p>
+  </header>
+
+  <div class="container">
+
+    <!-- Quick topic pills -->
+    <div class="topic-pills" id="pills"></div>
+
+    <!-- Chat window -->
+    <div id="chat-window">
+      <div class="bubble bot-bubble">
+        👋 Hi! I'm your FAQ assistant. Ask me anything about orders, returns, payments, or support — or click a topic above!
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="input-row">
+      <input type="text" id="user-input" placeholder="Type your question and press Enter..." />
+      <button onclick="handleSend()">Send</button>
+    </div>
+
+    <!-- NLP explanation panel -->
+    <div class="info-panel">
+      <h3>⚙️ NLP Techniques Used</h3>
+      <ul>
+        <li><strong>Tokenization</strong> — splits and cleans text into individual words</li>
+        <li><strong>Stopword Removal</strong> — filters out common words (is, the, a…)</li>
+        <li><strong>TF Vectorization</strong> — builds word-frequency vectors from FAQ corpus</li>
+        <li><strong>Cosine Similarity</strong> — finds the most semantically similar FAQ to your query</li>
+        <li><strong>Confidence Threshold</strong> — rejects low-score matches gracefully</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <footer>Task 2 – AI Chatbot for FAQs | Ansah Habib | BS Computer Science – UET Taxila</footer>
+
+  <script>
+    // ─── FAQ Knowledge Base ───────────────────────────────────────────────────
+    const faqs = [
+      {
+        q: "What is your return policy?",
+        a: "You can return any item within 30 days of purchase for a full refund. Items must be unused and in original packaging. Contact support to initiate a return."
+      },
+      {
+        q: "How do I track my order?",
+        a: "Once your order ships, you'll receive a tracking email. You can also log in to your account and visit 'My Orders' to see real-time tracking updates."
+      },
+      {
+        q: "Do you offer international shipping?",
+        a: "Yes! We ship to over 50 countries. International shipping rates and delivery times vary by destination and are calculated at checkout."
+      },
+      {
+        q: "How can I cancel or modify my order?",
+        a: "Orders can be cancelled or modified within 1 hour of placement. After that, they enter processing. Contact support immediately if you need changes."
+      },
+      {
+        q: "What payment methods do you accept?",
+        a: "We accept Visa, Mastercard, American Express, PayPal, and Apple Pay. All transactions are secured with 256-bit SSL encryption."
+      },
+      {
+        q: "How do I reset my password?",
+        a: "Click 'Forgot Password' on the login page and enter your email. You'll receive a reset link within a few minutes. Check your spam folder if it doesn't arrive."
+      },
+      {
+        q: "Is my personal data safe?",
+        a: "Absolutely. We follow strict GDPR and data privacy standards. Your data is never sold to third parties. See our Privacy Policy for full details."
+      },
+      {
+        q: "How do I contact customer support?",
+        a: "You can reach us via live chat (Mon–Fri, 9am–5pm), email at support@example.com, or call +1 800 123 4567. We typically respond within 24 hours."
+      },
+      {
+        q: "Can I use multiple discount codes?",
+        a: "Only one discount code can be applied per order. Codes cannot be combined with other offers unless explicitly stated in the promotion."
+      },
+      {
+        q: "What happens if my item arrives damaged?",
+        a: "We're sorry to hear that! Take photos and contact support within 48 hours of delivery. We'll send a replacement or issue a full refund right away."
+      },
+      {
+        q: "How long does delivery take?",
+        a: "Standard delivery takes 3–5 business days. Express delivery is available at checkout for next-day or 2-day arrival. International orders take 7–14 days."
+      },
+      {
+        q: "Do you have a loyalty or rewards program?",
+        a: "Yes! Join our rewards program to earn points on every purchase. Points can be redeemed for discounts on future orders. Sign up in your account settings."
+      },
+    ];
+
+    const topicLabels = [
+      "Return policy", "Track order", "International shipping",
+      "Cancel order", "Payment methods", "Password reset",
+      "Data privacy", "Contact support", "Discount codes",
+      "Damaged item", "Delivery time", "Rewards program"
+    ];
+
+    // ─── Stopwords ─────────────────────────────────────────────────────────────
+    const STOPWORDS = new Set([
+      "a","an","the","is","it","in","on","at","to","of","and","or","but",
+      "for","with","this","that","my","me","i","you","we","do","did","does",
+      "are","was","were","be","been","have","has","had","will","can","your",
+      "how","what","when","where","why","which","who","its","our","their"
+    ]);
+
+    // ─── NLP Utilities ─────────────────────────────────────────────────────────
+    function tokenize(text) {
+      return text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length > 1 && !STOPWORDS.has(w));
+    }
+
+    function buildVocab(corpus) {
+      const set = new Set();
+      corpus.forEach(tokens => tokens.forEach(t => set.add(t)));
+      return [...set];
+    }
+
+    function tfVector(tokens, vocab) {
+      const vec = new Array(vocab.length).fill(0);
+      tokens.forEach(t => {
+        const i = vocab.indexOf(t);
+        if (i >= 0) vec[i]++;
+      });
+      return vec;
+    }
+
+    function cosineSimilarity(a, b) {
+      const dot   = a.reduce((s, v, i) => s + v * b[i], 0);
+      const magA  = Math.sqrt(a.reduce((s, v) => s + v * v, 0));
+      const magB  = Math.sqrt(b.reduce((s, v) => s + v * v, 0));
+      return (magA && magB) ? dot / (magA * magB) : 0;
+    }
+
+    // ─── Pre-compute FAQ vectors ───────────────────────────────────────────────
+    const faqTokens = faqs.map(f => tokenize(f.q + ' ' + f.a));
+    const vocab     = buildVocab(faqTokens);
+    const faqVecs   = faqTokens.map(t => tfVector(t, vocab));
+
+    function findBestMatch(query) {
+      const qTokens = tokenize(query);
+      const qVec    = tfVector(qTokens, vocab);
+      let bestScore = -1, bestIdx = -1;
+      faqVecs.forEach((v, i) => {
+        const score = cosineSimilarity(qVec, v);
+        if (score > bestScore) { bestScore = score; bestIdx = i; }
+      });
+      return { faq: faqs[bestIdx], score: bestScore };
+    }
+
+    // ─── Chat UI ───────────────────────────────────────────────────────────────
+    const chatWindow = document.getElementById('chat-window');
+
+    function addBubble(html, type, meta) {
+      const div = document.createElement('div');
+      div.className = 'bubble ' + (type === 'user' ? 'user-bubble' : 'bot-bubble');
+      div.innerHTML = html;
+
+      if (meta) {
+        const mq = document.createElement('div');
+        mq.className = 'matched-q';
+        mq.textContent = '📎 Matched: "' + meta.q + '"';
+        div.appendChild(mq);
+
+        const sc = document.createElement('div');
+        const pct = Math.round(meta.score * 100);
+        sc.className = 'confidence' + (pct < 30 ? ' low' : '');
+        sc.textContent = '📊 Confidence: ' + pct + '%';
+        div.appendChild(sc);
+      }
+
+      chatWindow.appendChild(div);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function showTyping() {
+      const t = document.createElement('div');
+      t.className = 'typing';
+      t.id = 'typing-indicator';
+      t.textContent = 'Bot is thinking…';
+      chatWindow.appendChild(t);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function removeTyping() {
+      const t = document.getElementById('typing-indicator');
+      if (t) t.remove();
+    }
+
+    function handleSend() {
+      const input = document.getElementById('user-input');
+      const query = input.value.trim();
+      if (!query) return;
+
+      addBubble(query, 'user');
+      input.value = '';
+      showTyping();
+
+      setTimeout(() => {
+        removeTyping();
+        const { faq, score } = findBestMatch(query);
+
+        if (score < 0.06) {
+          addBubble(
+            "❓ I couldn't find a good match for that question. Try rephrasing, or click one of the topic buttons above.",
+            'bot'
+          );
+        } else {
+          addBubble(faq.a, 'bot', { q: faq.q, score });
+        }
+      }, 500);
+    }
+
+    document.getElementById('user-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleSend();
+    });
+
+    // ─── Render topic pills ────────────────────────────────────────────────────
+    const pillsEl = document.getElementById('pills');
+    topicLabels.forEach((label, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'pill';
+      btn.textContent = label;
+      btn.onclick = () => {
+        document.getElementById('user-input').value = faqs[i].q;
+        handleSend();
+      };
+      pillsEl.appendChild(btn);
+    });
+  </script>
+
+</body>
+</html>
